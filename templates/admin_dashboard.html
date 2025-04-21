@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-danger text-white">
+        <h5>Admin Dashboard</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5>Quick Actions</h5>
+                        <a href="{{ url_for('products') }}" class="btn btn-primary w-100 mb-2">Manage Products</a>
+                        <a href="{{ url_for('users') }}" class="btn btn-secondary w-100 mb-2">Manage Users</a>
+                        <a href="{{ url_for('reports') }}" class="btn btn-info w-100">View Reports</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card mt-3">
+                    <div class="card-header bg-info text-white">
+                        <h5>User Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                        <p>Total Users: {{ user_count }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

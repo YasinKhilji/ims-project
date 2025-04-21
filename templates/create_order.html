@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Create Order{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h5>Create New Order</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Product</label>
+                <select name="product_id" class="form-control" required>
+                    {% for product in products %}
+                    <option value="{{ product.product_id }}">{{ product.product_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Quantity</label>
+                <input type="number" name="quantity" class="form-control" required min="1">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-control"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Order</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Supplier Reports{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-info text-white">
+        <h5>Supplier Performance Reports</h5>
+    </div>
+    
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Products</th>
+                        <th>Total Stock</th>
+                        <th>Avg. Price</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for supplier in supplier_stats %}
+                    <tr>
+                        <td>{{ supplier.supplier_name }}</td>
+                        <td>{{ supplier.product_count }}</td>
+                        <td>{{ supplier.total_stock or 0 }}</td>
+                        <td>${{ "%.2f"|format(supplier.avg_price or 0) }}</td>
+                        <td>
+                            <a href="{{ url_for('supplier_details', supplier_id=supplier.supplier_id) }}" 
+                               class="btn btn-sm btn-info">
+                                View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="mt-4">
+            <canvas id="supplierChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('supplierChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ supplier_stats|map(attribute='supplier_name')|list|tojson }},
+            datasets: [{
+                label: 'Number of Products',
+                data: {{ supplier_stats|map(attribute='product_count')|list|tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.6)'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Products per Supplier'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
