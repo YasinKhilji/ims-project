@@ -1,77 +1,46 @@
 {% extends "base.html" %}
-
-{% block title %}Order Management{% endblock %}
-
+{% block title %}Orders{% endblock %}
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">All Orders</h5>
-        <a href="{{ url_for('create_order') }}" class="btn btn-light btn-sm">
-            <i class="fas fa-plus"></i> New Order
-        </a>
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5>Orders</h5>
     </div>
     <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <input type="text" class="form-control" placeholder="Search orders..." id="searchOrders">
-            </div>
-            <div class="col-md-4">
-                <select class="form-select" id="filterStatus">
-                    <option value="">All Statuses</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Cancelled">Cancelled</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-primary w-100" id="resetFilters">Reset</button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="table table-hover" id="ordersTable">
-                <thead class="table-light">
-                    <tr>
-                        <th>Order ID</th>
-                        <th>Product</th>
-                        <th>Quantity</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for order in orders %}
-                    <tr>
-                        <td>#{{ order.order_id }}</td>
-                        <td>{{ order.product_name }}</td>
-                        <td>{{ order.quantity_ordered }}</td>
-                        <td>
-                            {% if order.created_at %}
-                                {{ order.created_at.strftime('%Y-%m-%d') }}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge 
-                                {% if order.status == 'Approved' %}bg-success
-                                {% elif order.status == 'Pending' %}bg-warning
-                                {% else %}bg-secondary{% endif %}">
-                                {{ order.status }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('process_order', order_id=order.order_id) }}" 
-                               class="btn btn-sm btn-primary">
-                                <i class="fas fa-edit"></i> Process
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <a href="{{ url_for('create_new_order') }}" class="btn btn-primary mb-3">Create Order</a>
+        {% if orders %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Total Amount</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.order_id }}</td>
+                    <td>{{ order.product_name }}</td>
+                    <td>{{ order.quantity_ordered }}</td>
+                    <td>${{ "%.2f"|format(order.total_amount) }}</td>
+                    <td>{{ order.status }}</td>
+                    <td>{{ order.notes|default('N/A') }}</td>
+                    <td>
+                        {% if current_user.role in ['Admin', 'InventoryManager'] %}
+                        <a href="{{ url_for('process_order', order_id=order.order_id) }}" class="btn btn-primary btn-sm">Process</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">No orders found.</div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

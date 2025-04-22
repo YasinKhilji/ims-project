@@ -22,7 +22,6 @@
             padding: 0.25rem 0.5rem;
             font-size: 0.875rem;
         }
-        /* Fix for button groups in tables */
         .table .btn-group {
             white-space: nowrap;
             display: flex;
@@ -31,7 +30,6 @@
             flex: 1;
         }
     </style>
-    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -58,6 +56,9 @@
                                 <li class="nav-item">
                                     <a class="nav-link" href="{{ url_for('supplier_reports') }}">Reports</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('transactions') }}">Transactions</a>
+                                </li>
                             {% endif %}
                             {% if current_user.role in ['Admin', 'Sales'] %}
                                 <li class="nav-item">
@@ -68,6 +69,9 @@
                                 <li class="nav-item">
                                     <a class="nav-link" href="{{ url_for('users') }}">Users</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('audit_log') }}">Audit Log</a>
+                                </li>
                             {% endif %}
                         {% endif %}
                     </ul>
@@ -75,7 +79,7 @@
                         {% if current_user.is_authenticated %}
                             <li class="nav-item">
                                 <span class="navbar-text me-3">
-                                    Logged in as: <strong>{{ current_user.role }}</strong>
+                                    Logged in as: <strong>{{ current_user.username }}</strong>
                                 </span>
                             </li>
                             <li class="nav-item">
@@ -110,11 +114,8 @@
     <!-- Hidden CSRF Token for AJAX -->
     <div id="csrf-token" style="display:none;">{{ csrf_token() }}</div>
 
-    <!-- JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    
-    <!-- Auto-add CSRF token to forms -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const csrfToken = document.getElementById('csrf-token').textContent;

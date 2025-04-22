@@ -5,7 +5,7 @@ def get_db_connection():
     conn = psycopg2.connect(
         dbname="inventory_management",
         user="postgres",
-        password="280206",
+        password="lab@123",
         host="localhost",
         port="5432"
     )
@@ -70,10 +70,20 @@ def add_product(product_name, category, price, quantity, supplier_id, added_by, 
 def create_order(product_id, quantity, added_by, notes=None):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("CALL create_order(%s, %s, %s, %s, NULL, NULL)", (product_id, quantity, added_by, notes))
-    conn.commit()
-    cur.close()
-    conn.close()
+    order_id = None
+    status = None
+    try:
+        cur.execute("CALL create_order(%s, %s, %s, %s, %s, %s)", (product_id, quantity, added_by, notes, order_id, status))
+        conn.commit()
+        cur.execute("SELECT %s, %s", (order_id, status))
+        order_id, status = cur.fetchone()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+    return order_id, status
 
 def process_order(order_id, status, processed_by, notes=None):
     conn = get_db_connection()

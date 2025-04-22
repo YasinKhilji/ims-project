@@ -113,45 +113,43 @@ def logout():
     flash('Logged out successfully!', 'success')
     return redirect(url_for('login'))
 
-# Product routes
 @app.route('/products/edit/<int:product_id>', methods=['GET', 'POST'])
 @login_required
 @role_required('Admin', 'InventoryManager')
 def edit_product(product_id):
     from database import get_db_connection
+    conn = get_db_connection()
+    cur = conn.cursor()
+    suppliers = []  # Initialize suppliers to avoid UnboundLocalError
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        if request.method == 'POST':
+            product_name = request.form.get('product_name')
+            category = request.form.get('category')
+            price = request.form.get('price')
+            quantity = request.form.get('quantity')
+            supplier_id = request.form.get('supplier_id')
+            min_stocks = request.form.get('min_stocks')
+            updated_by = current_user.id
+            cur.execute("""
+                CALL update_product(%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (product_id, product_name, category, price, quantity, supplier_id, min_stocks, updated_by))
+            conn.commit()
+            flash('Product updated successfully!', 'success')
+            return redirect(url_for('products'))
         cur.execute("SELECT * FROM products WHERE product_id = %s AND is_deleted = FALSE", (product_id,))
         product = cur.fetchone()
-        cur.close()
-        conn.close()
         if not product:
             flash('Product not found!', 'danger')
             return redirect(url_for('products'))
-        if request.method == 'POST':
-            product_name = request.form.get('product_name', product['product_name'])
-            category = request.form.get('category', product['category'])
-            price = float(request.form.get('price', str(product['price']))) if request.form.get('price') else product['price']
-            quantity = int(request.form.get('quantity', str(product['quantity']))) if request.form.get('quantity') else product['quantity']
-            supplier_id = int(request.form.get('supplier_id', str(product['supplier_id']))) if request.form.get('supplier_id') else product['supplier_id']
-            min_stocks = int(request.form.get('min_stocks', str(product['min_stocks']))) if request.form.get('min_stocks') else product['min_stocks']
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("""
-                UPDATE products 
-                SET product_name = %s, category = %s, price = %s, quantity = %s, supplier_id = %s, min_stocks = %s, updated_at = NOW()
-                WHERE product_id = %s AND is_deleted = FALSE
-            """, (product_name, category, price, quantity, supplier_id, min_stocks, product_id))
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Product updated successfully!', 'success')
-            return redirect(url_for('products'))
-        return render_template('edit_product.html', product=product)
+        cur.execute("SELECT supplier_id, supplier_name FROM suppliers")
+        suppliers = cur.fetchall()
     except Exception as e:
-        flash(f'Error editing product: {str(e)}', 'danger')
-        return redirect(url_for('products'))
+        conn.rollback()
+        flash(f'Error updating product: {str(e)}', 'danger')
+    finally:
+        cur.close()
+        conn.close()
+    return render_template('edit_product.html', product=product, suppliers=suppliers)
 
 # Order routes
 @app.route('/orders')
@@ -164,38 +162,80 @@ def orders():
         flash(f'Error loading orders: {str(e)}', 'danger')
         return redirect(url_for('admin_dashboard' if current_user.role == 'Admin' else 'inventory_dashboard'))
 
+from database import get_db_connection
+
 @app.route('/orders/create', methods=['GET', 'POST'])
 @login_required
-def create_order():
-    from database import get_products
+@role_required('Sales', 'Admin')
+def create_new_order():
     if request.method == 'POST':
         product_id = request.form['product_id']
-        quantity = int(request.form['quantity'])
-        added_by = current_user.id
-        notes = request.form.get('notes')
-        create_order(product_id, quantity, added_by, notes)
-        flash('Order created successfully!', 'success')
-        return redirect(url_for('orders'))
-    products = get_products()
+        try:
+            quantity = int(request.form['quantity'])
+            if quantity <= 0:
+                flash('Quantity must be positive!', 'danger')
+                return redirect(url_for('create_new_order'))
+            added_by = current_user.id
+            notes = request.form.get('notes')
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("CALL create_order(%s, %s, %s, %s, %s, %s)", (product_id, quantity, added_by, notes, None, None))
+            conn.commit()
+            flash('Order created successfully!', 'success')
+            return redirect(url_for('orders'))
+        except Exception as e:
+            if 'conn' in locals():
+                conn.rollback()
+            flash(f'Error creating order: {str(e)}', 'danger')
+            return redirect(url_for('create_new_order'))
+        finally:
+            if 'cur' in locals():
+                cur.close()
+            if 'conn' in locals():
+                conn.close()
+    products = get_products()  # Assume this exists
     return render_template('create_order.html', products=products)
+
+@app.route('/audit_log')
+@login_required
+@role_required('Admin')
+def audit_log():
+    from database import get_db_connection
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT al.log_id, al.table_name, al.action, al.created_at, u.role
+            FROM audit_log al
+            LEFT JOIN users u ON al.changed_by = u.user_id
+            ORDER BY al.created_at DESC
+        """)
+        logs = cur.fetchall()
+    except Exception as e:
+        flash(f'Error fetching audit logs: {str(e)}', 'danger')
+        logs = []
+    finally:
+        cur.close()
+        conn.close()
+    return render_template('audit_log.html', logs=logs)
 
 @app.route('/orders/process/<int:order_id>', methods=['GET', 'POST'])
 @login_required
-@role_required('Admin', 'Sales')
+@role_required('Admin', 'InventoryManager')
 def process_order(order_id):
-    from database import get_db_connection, get_orders, process_order as db_process_order
-    order = next((o for o in get_orders() if o['order_id'] == order_id), None)
-    if not order:
-        flash('Order not found!', 'danger')
-        return redirect(url_for('orders'))
+    from database import process_order
     if request.method == 'POST':
         status = request.form['status']
         processed_by = current_user.id
         notes = request.form.get('notes')
-        db_process_order(order_id, status, processed_by, notes)
-        flash('Order processed successfully!', 'success')
-        return redirect(url_for('orders'))
-    return render_template('process_order.html', order=order)
+        try:
+            process_order(order_id, status, processed_by, notes)
+            flash('Order processed successfully!', 'success')
+            return redirect(url_for('orders'))
+        except Exception as e:
+            flash(f'Error processing order: {str(e)}', 'danger')
+            return redirect(url_for('process_order', order_id=order_id))
+    return render_template('process_order.html', order_id=order_id)
 
 # User management routes
 @app.route('/users', methods=['GET', 'POST'])
@@ -281,6 +321,31 @@ def edit_user(user_id):
         flash(f'Error editing user: {str(e)}', 'danger')
         print(f"Debug: Error in edit_user route - {str(e)}")  # Log the error
         return redirect(url_for('users'))
+    
+@app.route('/transactions')
+@login_required
+@role_required('Admin', 'InventoryManager')
+def transactions():
+    from database import get_db_connection
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT t.transaction_id, t.product_id, p.product_name, t.transaction_type, t.quantity,
+                   t.total_amount, u.username AS performed_by, t.transaction_date, t.notes
+            FROM transactions t
+            LEFT JOIN products p ON t.product_id = p.product_id
+            LEFT JOIN users u ON t.performed_by = u.user_id
+            ORDER BY t.transaction_date DESC
+        """)
+        transactions = cur.fetchall()
+    except Exception as e:
+        flash(f'Error fetching transactions: {str(e)}', 'danger')
+        transactions = []
+    finally:
+        cur.close()
+        conn.close()
+    return render_template('transactions.html', transactions=transactions)
     
 @app.route('/reports')
 @login_required

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5>Transactions</h5>
+    </div>
+    <div class="card-body">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ 'danger' if 'Error' in message else 'success' }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+        {% if transactions %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Transaction ID</th>
+                    <th>Product ID</th>
+                    <th>Product Name</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Total Amount</th>
+                    <th>Performed By</th>
+                    <th>Date</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transaction in transactions %}
+                <tr>
+                    <td>{{ transaction[0] }}</td>
+                    <td>{{ transaction[1] }}</td>
+                    <td>{{ transaction[2] if transaction[2] else 'N/A' }}</td>
+                    <td>{{ transaction[3] }}</td>
+                    <td>{{ transaction[4] }}</td>
+                    <td>{{ '%.2f'|format(transaction[5]) if transaction[5] else '0.00' }}</td>
+                    <td>{{ transaction[6] if transaction[6] else 'N/A' }}</td>
+                    <td>{{ transaction[7] }}</td>
+                    <td>{{ transaction[8] if transaction[8] else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">No transactions found.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
