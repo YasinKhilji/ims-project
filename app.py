@@ -15,16 +15,17 @@ login_manager.login_view = 'login'
 
 # Role requirements
 def role_required(*roles):
-    def wrapper(f):
+    def decorator(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):
             if not current_user.is_authenticated:
-                return login_manager.unauthorized()
+                return redirect(url_for('login'))
             if current_user.role not in roles:
-                abort(403)
+                flash('You do not have permission to access this page.', 'danger')
+                return redirect(url_for('home'))
             return f(*args, **kwargs)
         return decorated_view
-    return wrapper
+    return decorator
 
 # User model
 class User(UserMixin):
@@ -529,6 +530,24 @@ def supplier_reports():
     finally:
         cur.close()
         conn.close()
+
+@app.route('/low_stock')
+@login_required
+@role_required('Admin', 'InventoryManager')
+def low_stock():
+    from database import get_db_connection
+    conn = get_db_connection()
+    cur = conn.cursor()
+    low_stock_data = []
+    try:
+        cur.execute("SELECT * FROM vw_low_stock")
+        low_stock_data = cur.fetchall()
+    except Exception as e:
+        flash(f'Error fetching low stock data: {str(e)}', 'danger')
+    finally:
+        cur.close()
+        conn.close()
+    return render_template('low_stock.html', low_stock_data=low_stock_data)
 
 if __name__ == '__main__':
     app.run(debug=True)

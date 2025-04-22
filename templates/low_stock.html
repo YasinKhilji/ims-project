@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Low Stock Alert{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5>Low Stock Alert</h5>
+    </div>
+    <div class="card-body">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ 'danger' if 'Error' in message else 'success' }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% if low_stock_data %}
+        <table class="table table-striped table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Product ID</th>
+                    <th>Product Name</th>
+                    <th>Current Stock</th>
+                    <th>Minimum Stock</th>
+                    <th>Supplier</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in low_stock_data %}
+                <tr>
+                    <td>{{ item[0] }}</td>
+                    <td>{{ item[1] }}</td>
+                    <td>{{ item[2] }}</td>
+                    <td>{{ item[3] }}</td>
+                    <td>{{ item[4] if item[4] else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">
+            No products are currently below their minimum stock level. 
+            <br><small>To test, update a product's quantity to be less than its minimum stock 
+            (e.g., <code>UPDATE products SET quantity = 4 WHERE min_stocks = 5;</code>).</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
