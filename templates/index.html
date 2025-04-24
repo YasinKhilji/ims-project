@@ -3,6 +3,43 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5>Total Products</h5>
+                <h2>{{ product_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5>Low Stock</h5>
+                <h2>{{ low_stock_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5>Pending Orders</h5>
+                <h2>{{ pending_orders }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5>Today's Sales</h5>
+                <h2>${{ daily_sales }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Products and Orders Section -->
 <div class="row">
     <!-- Products Card -->
     <div class="col-lg-6 mb-4">

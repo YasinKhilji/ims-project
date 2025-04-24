@@ -77,9 +77,13 @@
                     <td>{{ user.email }}</td>
                     <td>{{ 'Yes' if user.is_active else 'No' }}</td>
                     <td>
+                        <a href="{{ url_for('view_user', user_id=user.user_id) }}" class="btn btn-info btn-sm">View</a>
                         <a href="{{ url_for('edit_user', user_id=user.user_id) }}" class="btn btn-sm btn-warning">Edit</a>
+                    
+                     
+                        
                     </td>
-                </tr>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>

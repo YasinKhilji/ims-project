@@ -659,6 +659,8 @@ def mark_notification_read(notification_id):
                 redirect_url = url_for('view_order', order_id=entity_id)
             elif entity_type == 'product':
                 redirect_url = url_for('edit_product', product_id=entity_id)
+            elif entity_type == 'user':
+                redirect_url = url_for('view_user', user_id=entity_id)  # Add this
         return redirect(redirect_url)
     except Exception as e:
         flash(f'Error marking notification as read: {str(e)}', 'danger')
@@ -700,5 +702,155 @@ def view_order(order_id):
     finally:
         cur.close()
         conn.close()
+
+DEFAULT_ROLE='Sales'
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+        email = request.form['email']
+        full_name = request.form['full_name']
+        role = request.form['role']
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'danger')
+            return redirect(url_for('register'))
+            
+        allowed_roles = ['Sales', 'InventoryManager']
+        if role not in allowed_roles:
+            flash('Invalid role selected', 'danger')
+            return redirect(url_for('register'))
+            
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            cur.execute("SELECT 1 FROM users WHERE username = %s OR email = %s", (username, email))
+            if cur.fetchone():
+                flash('Username or email already exists', 'danger')
+                return redirect(url_for('register'))
+            
+            cur.execute("""
+                INSERT INTO users (username, password, role, email, full_name, is_active)
+                VALUES (%s, crypt(%s, gen_salt('bf')), %s, %s, %s, FALSE)
+                RETURNING user_id
+            """, (username, password, role, email, full_name))
+            user_id = cur.fetchone()[0]
+            
+            # Find admin user dynamically
+            cur.execute("SELECT user_id FROM users WHERE role = 'Admin' LIMIT 1")
+            admin_row = cur.fetchone()
+            admin_id = admin_row[0] if admin_row else 1  # Fallback to 1 if no admin found
+            
+            conn.commit()
+            
+            create_notification(
+                user_id=admin_id,
+                message=f"New {role} registration awaiting approval: {username}",
+                notification_type="SystemAlert",
+                related_entity_type="user",
+                related_entity_id=user_id
+            )
+            
+            flash('Registration successful! Your account is pending admin approval.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            conn.rollback()
+            flash(f'Registration error: {str(e)}', 'danger')
+        finally:
+            cur.close()
+            conn.close()
+    
+    return render_template('register.html')
+
+@app.route('/admin/approve-users')
+@login_required
+@role_required('Admin')
+def approve_users():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM users WHERE is_active = FALSE ORDER BY created_at")
+        pending_users = cur.fetchall()
+        return render_template('approve_users.html', users=pending_users)
+    except Exception as e:
+        flash(f'Error loading pending users: {str(e)}', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    finally:
+        if 'cur' in locals(): cur.close()
+        if 'conn' in locals(): conn.close()
+
+@app.route('/admin/approve-user/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('Admin')
+def approve_user(user_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET is_active = TRUE WHERE user_id = %s", (user_id,))
+        conn.commit()
+        
+        # Notify the user their account was approved
+        create_notification(
+            user_id=user_id,
+            message="Your account has been approved! You can now login.",
+            notification_type="SystemAlert"
+        )
+        
+        flash('User approved successfully', 'success')
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error approving user: {str(e)}', 'danger')
+    finally:
+        if 'cur' in locals(): cur.close()
+        if 'conn' in locals(): conn.close()
+    return redirect(url_for('approve_users'))
+
+@app.route('/admin/users/<int:user_id>')
+@login_required
+@role_required('Admin')
+def view_user(user_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get user details
+        cur.execute("""
+            SELECT user_id, username, role, email, full_name, is_active, 
+                   created_at, updated_at
+            FROM users 
+            WHERE user_id = %s
+        """, (user_id,))
+        user = cur.fetchone()
+        print(f"DEBUG: Found user: {user}")
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('users'))
+            
+        return render_template('user_details.html', user=user)
+        
+    except Exception as e:
+        flash(f'Error loading user: {str(e)}', 'danger')
+        return redirect(url_for('users'))
+    finally:
+        if 'cur' in locals(): cur.close()
+        if 'conn' in locals(): conn.close()
+
+@app.route('/debug-routes')
+def debug_routes():
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'route': str(rule),
+            'methods': ', '.join(rule.methods),
+            'endpoint': rule.endpoint
+        })
+    return jsonify(routes)
 if __name__ == '__main__':
     app.run(debug=True)

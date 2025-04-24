@@ -110,14 +110,29 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_unit_price DECIMAL(10,2);
+    v_current_stock INTEGER;
 BEGIN
-    -- Validate
+    -- Validate quantity is positive
+    IF p_quantity_change <= 0 THEN
+        RAISE EXCEPTION 'Quantity must be positive';
+    END IF;
+    
+    -- Validate product exists
     IF NOT EXISTS (SELECT 1 FROM products WHERE product_id = p_product_id AND is_deleted = FALSE) THEN
         RAISE EXCEPTION 'Product not found or deleted';
     END IF;
     
+    -- Validate transaction type
     IF p_transaction_type NOT IN ('Purchase', 'Sale', 'Return', 'Adjustment') THEN
         RAISE EXCEPTION 'Invalid transaction type: %', p_transaction_type;
+    END IF;
+    
+    -- For sales, check stock availability
+    IF p_transaction_type = 'Sale' THEN
+        SELECT quantity INTO v_current_stock FROM products WHERE product_id = p_product_id;
+        IF v_current_stock < p_quantity_change THEN
+            RAISE EXCEPTION 'Insufficient stock. Available: %, Requested: %', v_current_stock, p_quantity_change;
+        END IF;
     END IF;
     
     -- Get current price
@@ -726,3 +741,21 @@ INSERT INTO products (product_name, category, price, quantity, supplier_id, adde
 
 GRANT INSERT ON audit_log to postgres
 Select * from audit_log
+
+
+-- Create notifications table
+CREATE TABLE notifications (
+    notification_id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id) NOT NULL,
+    message TEXT NOT NULL,
+    notification_type VARCHAR(50) NOT NULL 
+        CHECK (notification_type IN ('OrderCreated', 'OrderApproved', 'LowStock', 'SystemAlert')),
+    is_read BOOLEAN DEFAULT FALSE,
+    related_entity_type VARCHAR(20),  -- 'order', 'product', etc
+    related_entity_id INTEGER,        -- ID of the related entity
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for performance
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_unread ON notifications(user_id) WHERE is_read = FALSE;
