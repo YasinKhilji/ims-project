@@ -31,7 +31,9 @@
                     <td>${{ "%.2f"|format(product.price) }}</td>
                     <td>{{ product.quantity }}</td>
                     <td>
+                        {% if can_edit %}
                         <a href="{{ url_for('edit_product', product_id=product.product_id) }}" class="btn btn-sm btn-warning">Edit</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

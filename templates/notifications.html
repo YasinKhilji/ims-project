@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Your Notifications</h5>
+            <span class="badge bg-danger">{{ notifications|length }} total</span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if notifications %}
+        <div class="list-group">
+            {% for notification in notifications %}
+            <a href="{{ url_for('mark_notification_read', notification_id=notification.notification_id) }}"
+               class="list-group-item list-group-item-action {% if not notification.is_read %}list-group-item-primary{% endif %}">
+                <div class="d-flex w-100 justify-content-between">
+                    <p class="mb-1">{{ notification.message }}</p>
+                    <small>{{ notification.created_at|time_ago }}</small>
+                </div>
+                {% if notification.related_entity_type %}
+                <small class="text-muted">Click to view {{ notification.related_entity_type }}</small>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">No notifications found.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -5,7 +5,7 @@ def get_db_connection():
     conn = psycopg2.connect(
         dbname="inventory_management",
         user="postgres",
-        password="lab@123",
+        password="280206",
         host="localhost",
         port="5432"
     )
@@ -172,6 +172,77 @@ def delete_supplier(supplier_id):
         cur.execute("DELETE FROM suppliers WHERE supplier_id = %s", (supplier_id,))
         conn.commit()
     except Exception as e:
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+# Add these new functions to database.py
+
+def create_notification(user_id, message, notification_type, related_entity_type=None, related_entity_id=None):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO notifications 
+            (user_id, message, notification_type, related_entity_type, related_entity_id)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING notification_id
+        """, (user_id, message, notification_type, related_entity_type, related_entity_id))
+        notification_id = cur.fetchone()[0]
+        conn.commit()
+        return notification_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
+def get_user_notifications(user_id, limit=5):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT notification_id, message, is_read, created_at,
+                   related_entity_type, related_entity_id
+            FROM notifications
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (user_id, limit))
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+def get_unread_notification_count(user_id):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*) FROM notifications
+            WHERE user_id = %s AND is_read = FALSE
+        """, (user_id,))
+        return cur.fetchone()[0]
+    finally:
+        cur.close()
+        conn.close()
+
+def mark_notification_as_read(notification_id, user_id):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE notifications
+            SET is_read = TRUE
+            WHERE notification_id = %s AND user_id = %s
+            RETURNING related_entity_type, related_entity_id
+        """, (notification_id, user_id))
+        result = cur.fetchone()
+        conn.commit()
+        return result
+    except Exception as e:
+        conn.rollback()
         raise e
     finally:
         cur.close()
