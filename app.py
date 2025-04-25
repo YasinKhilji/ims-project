@@ -703,6 +703,91 @@ def view_order(order_id):
         cur.close()
         conn.close()
 
+@app.route('/products/add', methods=['GET', 'POST'])
+@login_required
+@role_required('Admin', 'InventoryManager')
+def add_product():
+    if request.method == 'POST':
+        try:
+            # Get form data with proper validation
+            product_name = request.form.get('product_name', '').strip()
+            category = request.form.get('category', '').strip()
+            
+            # Validate required fields
+            if not product_name or not category:
+                flash('Product name and category are required', 'danger')
+                return redirect(url_for('add_product'))
+            
+            # Convert with proper error handling
+            try:
+                price = float(request.form.get('price', 0))
+                quantity = int(request.form.get('quantity', 0))
+                supplier_id = int(request.form.get('supplier_id', 0))
+                min_stocks = int(request.form.get('min_stocks', 5))
+            except (ValueError, TypeError):
+                flash('Invalid numeric values provided', 'danger')
+                return redirect(url_for('add_product'))
+            
+            # Validate positive numbers
+            if price <= 0 or quantity < 0 or supplier_id <= 0 or min_stocks < 0:
+                flash('All numeric values must be positive', 'danger')
+                return redirect(url_for('add_product'))
+            
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            # Check supplier exists
+            cur.execute("SELECT 1 FROM suppliers WHERE supplier_id = %s", (supplier_id,))
+            if not cur.fetchone():
+                flash('Invalid supplier selected', 'danger')
+                return redirect(url_for('add_product'))
+            
+            # Insert product
+            cur.execute("""
+                INSERT INTO products (product_name, category, price, quantity, 
+                                    supplier_id, min_stocks, added_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING product_id
+            """, (product_name, category, price, quantity, 
+                 supplier_id, min_stocks, current_user.id))
+            
+            product_id = cur.fetchone()[0]
+            conn.commit()
+            
+            flash('Product added successfully!', 'success')
+            return redirect(url_for('products'))
+            
+        except Exception as e:
+            if 'conn' in locals():
+                conn.rollback()
+            flash(f'Error adding product: {str(e)}', 'danger')
+        finally:
+            if 'cur' in locals():
+                cur.close()
+            if 'conn' in locals():
+                conn.close()
+    
+    # GET request - show the form
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT supplier_id, supplier_name FROM suppliers ORDER BY supplier_name")
+        suppliers = cur.fetchall()
+        
+        if not suppliers:
+            flash('No suppliers found. Please add suppliers first.', 'warning')
+            return redirect(url_for('list_suppliers'))
+            
+        return render_template('add_product.html', suppliers=suppliers)
+    except Exception as e:
+        flash(f'Error loading form: {str(e)}', 'danger')
+        return redirect(url_for('products'))
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
+
 DEFAULT_ROLE='Sales'
 @app.route('/register', methods=['GET', 'POST'])
 def register():

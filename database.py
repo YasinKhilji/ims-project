@@ -5,7 +5,7 @@ def get_db_connection():
     conn = psycopg2.connect(
         dbname="inventory_management",
         user="postgres",
-        password="280206",
+        password="lab@123",
         host="localhost",
         port="5432"
     )
